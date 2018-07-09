@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_number": "484924643764",
+    "firebase_url": "https://letmehelpu-140614.firebaseio.com",
+    "project_id": "letmehelpu-140614",
+    "storage_bucket": "letmehelpu-140614.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:484924643764:android:af20fbffd6addde0",
+        "android_client_info": {
+          "package_name": "eu.letmehelpu.android"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "484924643764-j5tmcfaajcki5v5c9l7ku13ul6jtuva5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCU8gdBuME_T9Uy4UzuG_OwqsM_-yFnEtQ"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
