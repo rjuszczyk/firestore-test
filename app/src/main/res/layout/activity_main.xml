@@ -14,7 +14,7 @@
         android:layout_height="wrap_content"
         android:inputType="numberDecimal"
         android:hint="Enter user id"
-        android:imeOptions="actionSend"
+        android:imeOptions="actionNext"
          />
 
     <Button

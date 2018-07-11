@@ -16,7 +16,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".conversation.ConversationActivity" />
+        <activity android:name=".conversation.ConversationActivity"
+            />
         <activity android:name=".conversationlist.ConversationListActivity" />
         <service
             android:name=".MyFirebaseMessagingService">

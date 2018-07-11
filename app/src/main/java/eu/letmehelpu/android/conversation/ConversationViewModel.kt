@@ -21,7 +21,7 @@ class ConversationViewModel(val userId:Long, val conversation: Conversation) : V
         val db = FirebaseFirestore.getInstance()
         registration = db.collection("conversations")
                 .document(conversation!!.documentId)
-                .collection("conversations")
+                .collection("messages")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .addSnapshotListener { queryDocumentSnapshots, e ->
                     queryDocumentSnapshots?.let {
@@ -44,7 +44,7 @@ class ConversationViewModel(val userId:Long, val conversation: Conversation) : V
         val db = FirebaseFirestore.getInstance()
 
         db.collection("conversations").document(conversation!!.documentId)
-                .collection("conversations")
+                .collection("messages")
                 .add(message)
                 .addOnSuccessListener {
                     conversation.lastMessage = messageText

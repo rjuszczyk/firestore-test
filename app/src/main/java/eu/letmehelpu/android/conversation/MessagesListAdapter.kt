@@ -16,7 +16,7 @@ class MessagesListAdapter : RecyclerView.Adapter<MessagesListAdapter.MessageView
     }
 
     override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {
-        holder.setMessage(messages!![position].text)
+        holder.setMessage(messages!! [position])
     }
 
     override fun getItemCount() : Int {
@@ -30,8 +30,9 @@ class MessagesListAdapter : RecyclerView.Adapter<MessagesListAdapter.MessageView
 
     inner class MessageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
 
-        fun setMessage(message: String) {
-            (itemView as TextView).text = message
+        fun setMessage(message:  Message) {
+            (itemView as TextView).text = message.text
+            itemView.alpha = if (message.timestamp == null) 0.5f else 1f
         }
     }
 }
