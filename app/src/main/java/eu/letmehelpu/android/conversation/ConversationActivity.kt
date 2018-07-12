@@ -12,20 +12,38 @@ import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.TextView
 import eu.letmehelpu.android.R
+import eu.letmehelpu.android.abs.AbsPagedListAdapter
+import eu.letmehelpu.android.conversationlist.paging.MovieListPagedDataProviderFactory
+import eu.letmehelpu.android.conversationlist.paging.MoviesPageDataProvider
+import eu.letmehelpu.android.conversationlist.paging.MoviesPageDataProviderImpl
+import eu.letmehelpu.android.jobexecutor.PageProviderExecutor
 import eu.letmehelpu.android.model.Conversation
 
 class ConversationActivity : AppCompatActivity() {
 
-    private var adapter = MessagesListAdapter()
-    private var userId: Long = 9
+    private lateinit var adapter : MessagesListAdapter
+   // private lateinit var userId: Long
     private lateinit var conversation: Conversation
     private lateinit var conversationViewModel: ConversationViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val provider: MoviesPageDataProvider = MoviesPageDataProviderImpl()
+        val mo = MovieListPagedDataProviderFactory(provider)
 
-        userId = intent.getLongExtra(EXTRA_USER_ID, -1)
+        val userId = intent.getLongExtra(EXTRA_USER_ID, -1)
         conversation = intent.getSerializableExtra(EXTRA_CONVERSATION) as Conversation
+        val otherUsers = conversation.users.keys.map { it -> it.toLong() }.filter { it != userId }
+        adapter =
+
+                MessagesListAdapter(object : AbsPagedListAdapter.RetryListener {
+                    override fun retryCalled() {
+                        //movieListViewModel.retry()
+                    }
+                },
+                        otherUsers.toTypedArray()
+
+                        )
 
         setContentView(R.layout.conversation)
 
@@ -34,10 +52,14 @@ class ConversationActivity : AppCompatActivity() {
         messages.adapter = adapter
 
 
-        conversationViewModel = ViewModelProviders.of(this, ConversationViewModelFactory(userId, conversation)).get(ConversationViewModel::class.java)
+        conversationViewModel = ViewModelProviders.of(this, ConversationViewModelFactory(userId, conversation, mo, PageProviderExecutor())).get(ConversationViewModel::class.java)
 
         conversationViewModel.getMessages().observe(this, Observer {
-            it?.let{ adapter.setMessages(it)}
+            it?.let{ adapter.submitList(it)}
+        })
+
+        conversationViewModel.getUserIdsToReadTimes().observe(this, Observer {
+            it?.let { adapter.setLastReaded(it) }
         })
 
         val messageInput = findViewById<EditText>(R.id.message_input)

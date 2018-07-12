@@ -4,6 +4,7 @@ import com.google.firebase.Timestamp;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 
 public class Conversation implements Serializable {
@@ -26,6 +27,8 @@ public class Conversation implements Serializable {
 
     public Map<String, Boolean> users;
 
+    public Map<String, Long> lastRead;
+
     public Conversation() {
     }
 
@@ -42,6 +45,17 @@ public class Conversation implements Serializable {
         this.transactionId = conversationDocument.transactionId;
         this.usersCount = conversationDocument.usersCount;
         this.usersInactive = conversationDocument.usersInactive;
+
+        if(conversationDocument.lastRead != null) {
+            this.lastRead = new HashMap<>();
+            for (Map.Entry<String, Timestamp> stringTimestampEntry : conversationDocument.lastRead.entrySet()) {
+                Long value = null;
+                if(stringTimestampEntry.getValue() != null) {
+                    value = stringTimestampEntry.getValue().toDate().getTime();
+                }
+                this.lastRead.put(stringTimestampEntry.getKey(), value);
+            }
+        }
         this.users = conversationDocument.users;
     }
 
@@ -59,6 +73,17 @@ public class Conversation implements Serializable {
         conversationDocument.usersCount = this.usersCount;
         conversationDocument.usersInactive = this.usersInactive;
         conversationDocument.users = this.users;
+        if(this.lastRead != null) {
+            conversationDocument.lastRead = new HashMap<>();
+            for (Map.Entry<String, Long> stringLongEntry : this.lastRead.entrySet()) {
+                Timestamp value = null;
+                if(stringLongEntry.getValue() != null) {
+                    value = new Timestamp(new Date(stringLongEntry.getValue()));
+                }
+                conversationDocument.lastRead.put(stringLongEntry.getKey(), value);
+            }
+        }
+
         return conversationDocument;
     }
 }

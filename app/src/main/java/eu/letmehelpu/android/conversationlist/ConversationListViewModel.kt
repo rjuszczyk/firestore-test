@@ -7,6 +7,7 @@ import com.google.firebase.firestore.EventListener
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import eu.letmehelpu.android.AppConstant
 import eu.letmehelpu.android.model.Conversation
 import eu.letmehelpu.android.model.ConversationDocument
 import java.util.ArrayList
@@ -21,7 +22,7 @@ class ConversationListViewModel(userId:Long) : ViewModel() {
 
     private fun loadForUserId(userId:Long) {
         val db = FirebaseFirestore.getInstance()
-        registration = db.collection("conversations")
+        registration = db.collection(AppConstant.COLLECTION_CONVERSATION)
                 .whereEqualTo(FieldPath.of("users", userId.toString()), true)
                 // .orderBy("timestamp")
                 .addSnapshotListener(EventListener { queryDocumentSnapshots, e ->

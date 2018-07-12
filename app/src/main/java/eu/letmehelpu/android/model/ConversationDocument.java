@@ -23,4 +23,6 @@ public class ConversationDocument {
     public Map<String,Boolean> usersInactive;
 
     public Map<String,Boolean> users;
+
+    public Map<String,Timestamp> lastRead;
 }

@@ -1,4 +1,4 @@
-package com.example.radek.firebase_messaging
+package eu.letmehelpu.android.firebase_messaging
 
 import org.junit.Test
 

@@ -14,13 +14,15 @@ import eu.letmehelpu.android.model.Conversation
 
 class ConversationListActivity : AppCompatActivity(), ConversationListAdapter.OnConversationSelectedListener {
 
-    private var conversationListAdapter = ConversationListAdapter(this)
+    private lateinit var conversationListAdapter:ConversationListAdapter
     private var userId: Long = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        userId = intent.getLongExtra(EXTRA_USER_ID, 9)
+        userId = intent.getLongExtra(EXTRA_USER_ID, -1)
+        if(userId == -1L) throw RuntimeException()
+        conversationListAdapter = ConversationListAdapter(userId, this)
 
         setContentView(R.layout.collection_list)
 

@@ -7,7 +7,7 @@ import android.widget.TextView
 
 import eu.letmehelpu.android.model.Conversation
 
-class ConversationListAdapter(private val conversationSelectedListener: OnConversationSelectedListener) : RecyclerView.Adapter<ConversationListAdapter.MessageViewHolder>() {
+class ConversationListAdapter(private val userId:Long, private val conversationSelectedListener: OnConversationSelectedListener) : RecyclerView.Adapter<ConversationListAdapter.MessageViewHolder>() {
 
     internal var conversations: List<Conversation>? = null
 
@@ -42,8 +42,20 @@ class ConversationListAdapter(private val conversationSelectedListener: OnConver
 
         fun bind(conversation: Conversation) {
             this.conversation = conversation
-            (itemView as TextView).text = "message=" + conversation.lastMessage
+            if(hasNotReadMessages(conversation)) {
+                (itemView as TextView).text = "last message=" + conversation.lastMessage + " (!)"
+            } else {
+                (itemView as TextView).text = "last message=" + conversation.lastMessage
+            }
         }
+    }
+
+    fun hasNotReadMessages(conversation: Conversation) : Boolean {
+        return conversation.timestamp?:0 > getLastMessageReadTimeByCurentUser(conversation)
+    }
+
+    fun getLastMessageReadTimeByCurentUser(conversation: Conversation) : Long {
+        return conversation.lastRead[userId.toString()]?:0
     }
 
     interface OnConversationSelectedListener {
