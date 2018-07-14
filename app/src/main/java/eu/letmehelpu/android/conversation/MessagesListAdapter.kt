@@ -1,5 +1,7 @@
 package eu.letmehelpu.android.conversation
 
+import android.arch.paging.PagedList
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -7,6 +9,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import eu.letmehelpu.android.abs.AbsPagedListAdapter
 import eu.letmehelpu.android.conversationlist.paging.MovieItemCallback
+import eu.letmehelpu.android.model.FirstMessage
 import eu.letmehelpu.android.model.Message
 
 class MessagesListAdapter(
@@ -24,24 +27,18 @@ class MessagesListAdapter(
     }
 
     override fun createItemViewHolder(parent: ViewGroup): ItemViewHolder<Message> {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-
-    internal var userIdsToReadTimes:Map<Long, Long>? = null
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
         val tv = TextView(parent.context)
         var lp = ViewGroup.MarginLayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (parent.resources.displayMetrics.density* 70).toInt())
 
         tv.layoutParams = lp
         return MessageViewHolder(tv)
     }
-//
-//    fun setMessages(messages: List<Message>) {
-//        this.messages = messages
-//        notifyDataSetChanged()
-//    }
+
+    override fun submitList(pagedList: PagedList<Message>?) {
+        super.submitList(pagedList)
+    }
+
+    internal var userIdsToReadTimes:Map<Long, Long>? = null
 
     fun setLastReaded(userIdsToReadTimes:Map<Long, Long> ) {
         this.userIdsToReadTimes = userIdsToReadTimes
@@ -60,12 +57,27 @@ class MessagesListAdapter(
         }
     }
 
+    override fun onBindViewHolder(holder: MyHolder<Message>, position: Int) {
+        super.onBindViewHolder(holder, position)
+    }
+
+    override fun onBindViewHolder(holder: MyHolder<Message>, position: Int, payloads: MutableList<Any>) {
+        super.onBindViewHolder(holder, position, payloads)
+    }
+
     inner class MessageViewHolder(itemView: View) : ItemViewHolder<Message>(itemView){
         override fun bind(item: Message?) {
+
+            Log.d("item", ""+item!!.timestamp)
+
             item?.let {
+                if(it is FirstMessage) {
+                    (itemView as TextView).text = "-------"
+                    return
+                }
                 val message = it
                 val send = message.timestamp != null
-                itemView.alpha = if (send) 1f else 0.5f
+
 
                 if(send) {
                     var readByAllUsers =  isMessageReadByAllusers(message)
@@ -75,8 +87,10 @@ class MessagesListAdapter(
                         (itemView as TextView).text = "[NOT READ]" +  message.text
                     }
                 } else {
-                    (itemView as TextView).text = "[NOT READ]" +  message.text
+                    (itemView as TextView).text = "[NOT SEND]" +  message.text
                 }
+
+               // itemView.alpha = if (send) 1f else 0.5f
             }
 
         }

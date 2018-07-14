@@ -17,4 +17,20 @@ public class Message {
     @Nullable
     public Timestamp timestamp;
 
+    public Timestamp sendTimestamp;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Message message = (Message) o;
+
+        if (by != message.by) return false;
+        if (seen != message.seen) return false;
+        if (text != null ? !text.equals(message.text) : message.text != null) return false;
+        if (timestamp != null ? !timestamp.equals(message.timestamp) : message.timestamp != null)
+            return false;
+        return sendTimestamp != null ? sendTimestamp.equals(message.sendTimestamp) : message.sendTimestamp == null;
+    }
 }

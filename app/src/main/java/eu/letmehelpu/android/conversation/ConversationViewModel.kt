@@ -2,28 +2,30 @@ package eu.letmehelpu.android.conversation
 
 import android.arch.lifecycle.LiveData
 import android.arch.lifecycle.MutableLiveData
-import android.arch.lifecycle.Transformations
 import android.arch.lifecycle.ViewModel
 import android.arch.paging.DataSource
+import android.arch.paging.LivePagedListBuilder
 import android.arch.paging.PageKeyedDataSource
 import android.arch.paging.PagedList
 import android.util.Log
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.*
+import com.google.firebase.firestore.EventListener
 import eu.letmehelpu.android.AppConstant
+import eu.letmehelpu.android.conversationlist.paging.MovieListPagedDataProviderFactory
 import eu.letmehelpu.android.model.Conversation
 import eu.letmehelpu.android.model.ConversationDocument
+import eu.letmehelpu.android.model.FirstMessage
 import eu.letmehelpu.android.model.Message
+import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
-import eu.letmehelpu.android.jobexecutor.PageProviderExecutor
-import eu.letmehelpu.android.conversationlist.paging.MovieListPagedDataProviderFactory
 
 class ConversationViewModel(
         private val userId: Long,
         val conversation: Conversation,
         private val movieListPagedDataProviderFactory: MovieListPagedDataProviderFactory,
-        private val pageProviderExecutor: PageProviderExecutor<Message>,
         private val mainThreadExecutor: Executor
 ) : ViewModel() {
     private val messages:LiveData<PagedList<Message>>
@@ -32,83 +34,166 @@ class ConversationViewModel(
     private lateinit var registration2: ListenerRegistration
 
     init {
-        pageProviderExecutor.repositoryState = {
-//            repositoryState.postValue(it)
-        }
-        val x : android.arch.core.util.Function<Map<Long, Long>, PagedList<Message>>  = object : android.arch.core.util.Function<Map<Long, Long>, PagedList<Message>> {
-            override fun apply(input: Map<Long, Long>): PagedList<Message> {
-                return preparePagedList(mainThreadExecutor, conversation)
-            }
-
-        }
-
-        messages = Transformations.map(userIdsToReadTimes, x)
+//        val x : android.arch.core.util.Function<Map<Long, Long>, PagedList<Message>>  = object : android.arch.core.util.Function<Map<Long, Long>, PagedList<Message>> {
+//            override fun apply(input: Map<Long, Long>): PagedList<Message> {
+//                return preparePagedList(mainThreadExecutor, conversation)
+//            }
+//
+//        }
+        userIdsToReadTimes.observeForever { latestDataSource?.invalidate() }
+        messages = preparePagedList( mainThreadExecutor, conversation)
+        //Transformations.map(userIdsToReadTimes, x)
         loadMessagesForConversation()
     }
+    var lastRead = 0L
+    var latestDataSource:DataSource<Timestamp, Message>? = null
+    private fun preparePagedList(mainThreadExecutor: Executor, conversation: Conversation): LiveData<PagedList<Message>> {
 
-    private fun preparePagedList(mainThreadExecutor: Executor, conversation: Conversation): PagedList<Message> {
 
-        val dataSource: DataSource<Timestamp, Message>
+        //val dataSource = pageKeyedDataSource(conversation)
+        val dataSourceFactory = object : DataSource.Factory<Timestamp, Message>() {
+            override fun create(): DataSource<Timestamp, Message> {
+                Log.d("RADEK", "CREATE")
+                val dataSource = pageKeyedDataSource(conversation)
+                latestDataSource = dataSource
+                return dataSource
+            }
+        }
 
-        pageProviderExecutor.attachDataProvider(movieListPagedDataProviderFactory.create(conversation.documentId))
+        return LivePagedListBuilder(
+                dataSourceFactory,
+//                factory(),
+                50)
+                //.setFetchExecutor(IO_EXECUTOR)
+                .build()
+//        return PagedList.Builder(dataSource, 10)
+//                .setNotifyExecutor(mainThreadExecutor)
+//                .setFetchExecutor(mainThreadExecutor)
+//                .
+//                .build()
+    }
 
-        dataSource = object : PageKeyedDataSource<Timestamp, Message>() {
+    private fun pageKeyedDataSource(conversation: Conversation): DataSource<Timestamp, Message> {
+        return object : PageKeyedDataSource<Timestamp, Message>() {
             override fun loadInitial(params: LoadInitialParams<Timestamp>, callback: LoadInitialCallback<Timestamp, Message>) {
-                pageProviderExecutor.loadInitialPage {
+                Log.d("LOADER", "loadInitial")
+                val db = FirebaseFirestore.getInstance()
+                var r: ListenerRegistration? = null
+                val countDownLatch  = CountDownLatch(1)
+                r = db.collection(AppConstant.COLLECTION_CONVERSATION)
 
-                    val nextPage = it.list.lastOrNull()?.timestamp ?: null
-                    callback.onResult(it.list, null, nextPage)
+                        .document(conversation.documentId)
+                        .collection("messages")
+                        .orderBy("sendTimestamp", Query.Direction.DESCENDING)
+                        .limit(params.requestedLoadSize.toLong())
+                        .addSnapshotListener(object : EventListener<QuerySnapshot> {
+                            override fun onEvent(p0: QuerySnapshot?, p1: FirebaseFirestoreException?) {
+                                p0?.let {
+                                    val messages = it.toObjects(Message::class.java)
 
 
+                                    val newest = messages.firstOrNull()?.sendTimestamp
+                                    val oldest = messages.lastOrNull()?.sendTimestamp
+                                    var result = ArrayList<Message>(messages.size+1)
+                                    result.add(FirstMessage())
+                                    result.addAll(messages)
+                                    Log.d("LOADER", String.format("loadInitial -> %s %s", f(newest), f(oldest)))
 
-                    val messagesFromServer = it.list.filter { it.timestamp != null }.map { it.timestamp }.firstOrNull()
-                    messagesFromServer?.let {
-                        val lastReadTime:Long = conversation.lastRead[userId.toString()]?:0
-                        Log.d("RADEK", "user " + userId + " has last msg " + messagesFromServer.toDate().time)
-                        Log.d("LASTMSG", "lastReadTime = " + lastReadTime +"\nlastMsgTime = " + it.toDate().time+"\n")
-                        if(it.toDate().time > lastReadTime) {
-                            updateConversationWithLastRead(it.toDate().time)
-                        }
-                    }
-                }
+
+                                    if(countDownLatch.count == 1L) {
+                                        callback.onResult(result, newest, oldest)
+                                        countDownLatch.countDown()
+                                    } else {
+                                        invalidate()
+                                        r!!.remove()
+                                    }
+                                }
+                            }
+                        })
+
+                countDownLatch.await()
             }
 
             override fun loadAfter(params: LoadParams<Timestamp>, callback: LoadCallback<Timestamp, Message>) {
-                pageProviderExecutor.loadPage(params.key, {
-                    val nextPage = it.list.lastOrNull()?.timestamp ?: null
-                    callback.onResult(it.list, nextPage)
-                }, true)
+
+                Log.d("LOADER", "loadAfter" + f(params.key))
+                val countDownLatch  = CountDownLatch(1)
+
+                val db = FirebaseFirestore.getInstance()
+                var r: ListenerRegistration? = null
+                r = db.collection(AppConstant.COLLECTION_CONVERSATION)
+                        .document(conversation.documentId)
+                        .collection("messages")
+                        .orderBy("sendTimestamp", Query.Direction.DESCENDING)
+                        .whereLessThan("sendTimestamp", params.key)
+                        .limit(params.requestedLoadSize.toLong())
+
+                        .addSnapshotListener(object : EventListener<QuerySnapshot> {
+                            override fun onEvent(p0: QuerySnapshot?, p1: FirebaseFirestoreException?) {
+                                p0?.let {
+                                    val messages = it.toObjects(Message::class.java)
+                                    val newest = messages.firstOrNull()?.sendTimestamp
+                                    val oldest = messages.lastOrNull()?.sendTimestamp
+
+                                    Log.d("LOADER", String.format("loadAfter -> %s %s", f(newest), f(oldest)))
+
+                                    callback.onResult(messages, oldest)
+                                    r!!.remove()
+                                    countDownLatch.countDown()
+                                }
+                            }
+                        })
+
+                countDownLatch.await()
             }
 
             override fun loadBefore(params: LoadParams<Timestamp>, callback: LoadCallback<Timestamp, Message>) {
-                pageProviderExecutor.loadPage(params.key, {
-                    val nextPage = it.list.firstOrNull()?.timestamp ?: null
-                    callback.onResult(it.list, nextPage)
-                }, false)
+                Log.d("LOADER", "loadBefore " + f(params.key))
+                val db = FirebaseFirestore.getInstance()
+                var r: ListenerRegistration? = null
+                val countDownLatch  = CountDownLatch(1)
+                r = db.collection(AppConstant.COLLECTION_CONVERSATION)
+                        .document(conversation.documentId)
+                        .collection("messages")
+                        .orderBy("sendTimestamp", Query.Direction.ASCENDING)
+                        .whereGreaterThan("sendTimestamp", params.key)
+                        .limit(params.requestedLoadSize.toLong())
+
+                        .addSnapshotListener(object : EventListener<QuerySnapshot> {
+                            override fun onEvent(p0: QuerySnapshot?, p1: FirebaseFirestoreException?) {
+                                p0?.let {
+                                    val messages = it.toObjects(Message::class.java)
+                                    Collections.sort(messages, object : Comparator<Message> {
+                                        override fun compare(p0: Message, p1: Message): Int {
+                                            return p0.sendTimestamp.toDate().compareTo(p1.sendTimestamp.toDate())
+                                        }
+                                    })
+
+                                    val newest = messages.firstOrNull()?.sendTimestamp
+                                    val oldest = messages.lastOrNull()?.sendTimestamp
+
+                                    Log.d("LOADER", String.format("loadBefore -> %s %s", f(newest), f(oldest)))
+
+                                    callback.onResult(messages, newest)
+                                    r!!.remove()
+                                    countDownLatch.countDown()
+                                }
+                            }
+                        })
+                countDownLatch.await()
+            }
+
+            val f = SimpleDateFormat("HH:mm:ss")
+            fun f(t: Timestamp?): String? {
+                if (t == null) return null
+                return f.format(t?.toDate())
             }
         }
-
-        return PagedList.Builder(dataSource, 10)
-                .setNotifyExecutor(mainThreadExecutor)
-                .setFetchExecutor(mainThreadExecutor)
-                .build()
     }
-    
-    
+
+
     private fun loadMessagesForConversation() {
         val db = FirebaseFirestore.getInstance()
-//        registration = db.collection(AppConstant.COLLECTION_CONVERSATION)
-//                .document(conversation!!.documentId)
-//                .collection("messages")
-//                .orderBy("timestamp", Query.Direction.DESCENDING)
-//                .addSnapshotListener { queryDocumentSnapshots, e ->
-//                    queryDocumentSnapshots?.let {
-//                        val loadedMessages = it.toObjects(Message::class.java)
-//                        messages.value = loadedMessages
-//
-//
-//                    }
-//                }
 
         registration2 = db.collection(AppConstant.COLLECTION_CONVERSATION)
                 .document(conversation!!.documentId).addSnapshotListener { queryDocumentSnapshots, e ->
@@ -125,17 +210,37 @@ class ConversationViewModel(
                                     }
                                     .filter { it.first != userId }
                             )
-                            Log.d("RADEK", "user " + userId + " is receiving" + AppConstant.printReadTimes(conversation))
-                            userIdsToReadTimes.value = map
+                            Log.d("RADEK", "check if I can send")
+                            if(otherUserReadsChanged(map)) {
+                                userIdsToReadTimes.value = map
+                                latestDataSource?.invalidate()
+                            }
+
+                            val readTime = it.timestamp.toDate().time
+                            if(lastRead != readTime) {
+                                lastRead = readTime
+                                updateConversationWithLastRead(readTime)
+                            }
+
                         }
                     }
                 }
     }
 
-    private fun updateConversationWithLastRead(lastMessageTime: Long) {
+    private fun otherUserReadsChanged(map: HashMap<Long, Long>) :Boolean {
+        userIdsToReadTimes.value?.let {
+            val oldMap = it
+            for (entry in map.filter { it.key != userId }) {
+                if(entry.value != oldMap[entry.key])
+                    return true
+            }
+            return false
+        }?: run { return true }
+    }
 
+    private fun updateConversationWithLastRead(lastMessageTime: Long) {
         conversation.lastRead[userId.toString()] = lastMessageTime
-        synchronizeConversation(FirebaseFirestore.getInstance())
+        updateLastRead(FirebaseFirestore.getInstance())
     }
 
     fun getMessages(): LiveData<PagedList<Message>> {
@@ -147,19 +252,24 @@ class ConversationViewModel(
     }
 
     fun sendMessage(messageText: String) {
+      //  if(1==1)return
         val message = Message()
         message.by = userId
         message.seen = false
         message.text = messageText
         message.timestamp = null//System.currentTimeMillis();
+        message.sendTimestamp = Timestamp.now()//System.currentTimeMillis();
         val db = FirebaseFirestore.getInstance()
 
         db.collection(AppConstant.COLLECTION_CONVERSATION).document(conversation!!.documentId)
                 .collection("messages")
                 .add(message)
+
+        //latestDataSource?.invalidate()
+        //userIdsToReadTimes.value = userIdsToReadTimes.value
     }
 
-    private fun synchronizeConversation(db: FirebaseFirestore) {
+    private fun updateLastRead(db: FirebaseFirestore) {
         val conversationDocument = conversation!!.toConversationDocument()
 
         Log.d("RADEK", "user " + userId + " is sending" + AppConstant.printReadTimes(conversation))
@@ -174,7 +284,6 @@ class ConversationViewModel(
 
 
     override fun onCleared() {
-//        registration.remove()
         registration2.remove()
     }
 }

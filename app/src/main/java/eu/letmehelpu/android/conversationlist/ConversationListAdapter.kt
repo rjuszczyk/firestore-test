@@ -55,7 +55,9 @@ class ConversationListAdapter(private val userId:Long, private val conversationS
     }
 
     fun getLastMessageReadTimeByCurentUser(conversation: Conversation) : Long {
-        return conversation.lastRead[userId.toString()]?:0
+        conversation.lastRead?.let {
+            return it[userId.toString()]?:0
+        }?:return 0
     }
 
     interface OnConversationSelectedListener {

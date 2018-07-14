@@ -19,6 +19,6 @@ class ConversationViewModelFactory(
         val e = Executor { p0 -> handler.post(p0) }
         @Suppress("UNCHECKED_CAST")
         return ConversationViewModel(userId, conversation,
-                movieListPagedDataProviderFactory, pageProviderExecutor, e) as T
+                movieListPagedDataProviderFactory, e) as T
     }
 }
