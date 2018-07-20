@@ -1,6 +1,7 @@
 package eu.letmehelpu.android;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
@@ -14,6 +15,10 @@ import android.widget.TextView;
 
 import eu.letmehelpu.android.conversation.ConversationActivity;
 import eu.letmehelpu.android.conversationlist.ConversationListActivity;
+import eu.letmehelpu.android.messaging.MessagingManager;
+import eu.letmehelpu.android.messaging.MessagingTokenStoreage;
+import eu.letmehelpu.android.messaging.UserIdStoreage;
+import eu.letmehelpu.android.network.Helper;
 
 public class MainActivity extends AppCompatActivity{
     @Override
@@ -54,6 +59,8 @@ public class MainActivity extends AppCompatActivity{
         next.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                MessagingManager manager = new MessagingManager(new UserIdStoreage(getSharedPreferences("messaging", MODE_PRIVATE)), new MessagingTokenStoreage(getSharedPreferences("messaging", MODE_PRIVATE)));
+                manager.putUserId(Long.valueOf(userId.getText().toString()));
                 navigateNext(Integer.parseInt(userId.getText().toString()));
             }
         });
