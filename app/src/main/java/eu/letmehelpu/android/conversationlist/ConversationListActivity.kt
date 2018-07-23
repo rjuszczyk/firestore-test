@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
+import android.widget.ImageView
 import eu.letmehelpu.android.R
 import eu.letmehelpu.android.conversation.ConversationActivity
 import eu.letmehelpu.android.model.Conversation
@@ -25,6 +26,8 @@ class ConversationListActivity : AppCompatActivity(), ConversationListAdapter.On
         conversationListAdapter = ConversationListAdapter(userId, this)
 
         setContentView(R.layout.collection_list)
+        val testImage = findViewById < ImageView >(R.id.testImage)
+//            GlideApp.with(this).load("http://goo.gl/gEgYUd").into(testImage)
 
         val conversations = findViewById < RecyclerView >(R.id.conversations)
         conversations.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
