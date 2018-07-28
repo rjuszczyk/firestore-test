@@ -12,6 +12,7 @@ import eu.letmehelpu.android.R
 import eu.letmehelpu.android.conversation.ConversationActivity
 import eu.letmehelpu.android.model.Conversation
 
+
 class ConversationListActivity : AppCompatActivity(), ConversationListAdapter.OnConversationSelectedListener {
 
     private lateinit var conversationListAdapter:ConversationListAdapter
@@ -39,6 +40,8 @@ class ConversationListActivity : AppCompatActivity(), ConversationListAdapter.On
     override fun onConversationSelected(conversation: Conversation) {
         startActivity(ConversationActivity.createIntent(this, userId, conversation))
     }
+
+
 
     companion object {
         val EXTRA_USER_ID = "userId"

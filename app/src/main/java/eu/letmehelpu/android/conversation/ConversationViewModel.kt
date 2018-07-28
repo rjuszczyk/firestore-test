@@ -13,6 +13,7 @@ import com.google.firebase.firestore.*
 import com.google.firebase.firestore.EventListener
 import eu.letmehelpu.android.AppConstant
 import eu.letmehelpu.android.conversationlist.paging.MovieListPagedDataProviderFactory
+import eu.letmehelpu.android.messaging.SendMessage
 import eu.letmehelpu.android.model.Conversation
 import eu.letmehelpu.android.model.ConversationDocument
 import eu.letmehelpu.android.model.FirstMessage
@@ -26,7 +27,8 @@ class ConversationViewModel(
         private val userId: Long,
         val conversation: Conversation,
         private val movieListPagedDataProviderFactory: MovieListPagedDataProviderFactory,
-        private val mainThreadExecutor: Executor
+        mainThreadExecutor: Executor,
+        private val sendMessage: SendMessage
 ) : ViewModel() {
     private val messages:LiveData<PagedList<Message>>
     private val userIdsToReadTimes = MutableLiveData<Map<Long, Long>>()
@@ -252,21 +254,7 @@ class ConversationViewModel(
     }
 
     fun sendMessage(messageText: String) {
-      //  if(1==1)return
-        val message = Message()
-        message.by = userId
-        message.seen = false
-        message.text = messageText
-        message.timestamp = null//System.currentTimeMillis();
-        message.sendTimestamp = Timestamp.now()//System.currentTimeMillis();
-        val db = FirebaseFirestore.getInstance()
-
-        db.collection(AppConstant.COLLECTION_CONVERSATION).document(conversation!!.documentId)
-                .collection("messages")
-                .add(message)
-
-        //latestDataSource?.invalidate()
-        //userIdsToReadTimes.value = userIdsToReadTimes.value
+        sendMessage.sendMessage(conversation.documentId, userId, messageText)
     }
 
     private fun updateLastRead(db: FirebaseFirestore) {

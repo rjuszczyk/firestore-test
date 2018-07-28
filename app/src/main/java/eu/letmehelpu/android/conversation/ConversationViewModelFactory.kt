@@ -5,6 +5,7 @@ import android.arch.lifecycle.ViewModelProvider
 import android.os.Handler
 import eu.letmehelpu.android.conversationlist.paging.MovieListPagedDataProviderFactory
 import eu.letmehelpu.android.jobexecutor.PageProviderExecutor
+import eu.letmehelpu.android.messaging.SendMessage
 import eu.letmehelpu.android.model.Conversation
 import eu.letmehelpu.android.model.Message
 import java.util.concurrent.Executor
@@ -13,12 +14,13 @@ class ConversationViewModelFactory(
         val userId:Long,
         val conversation: Conversation,
         private val movieListPagedDataProviderFactory: MovieListPagedDataProviderFactory,
-        private val pageProviderExecutor: PageProviderExecutor<Message>) : ViewModelProvider.Factory {
+        private val pageProviderExecutor: PageProviderExecutor<Message>,
+        private val sendMessage: SendMessage) : ViewModelProvider.Factory {
     override fun <T : ViewModel?> create(modelClass: Class<T>): T {
         val handler = Handler()
         val e = Executor { p0 -> handler.post(p0) }
         @Suppress("UNCHECKED_CAST")
         return ConversationViewModel(userId, conversation,
-                movieListPagedDataProviderFactory, e) as T
+                movieListPagedDataProviderFactory, e, sendMessage) as T
     }
 }

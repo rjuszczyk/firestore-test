@@ -13,6 +13,7 @@ public class MessagingTokenStoreage {
     public void updateMessagingToken(@Nullable String messagingToken, MessagingTokenChanged messagingTokenChanged) {
         String oldMessagingToken = getMessagingToken();
         setMessagingToken(messagingToken);
+
         if(oldMessagingToken == null) {
             if(messagingToken != null) {
                 messagingTokenChanged. messagingTokenChanged(null, messagingToken);
