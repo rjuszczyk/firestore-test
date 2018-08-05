@@ -11,42 +11,30 @@ import android.support.v7.widget.RecyclerView
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.TextView
-import eu.letmehelpu.android.MyFirebaseMessagingService
+import dagger.android.support.DaggerAppCompatActivity
 import eu.letmehelpu.android.R
-import eu.letmehelpu.android.abs.AbsPagedListAdapter
-import eu.letmehelpu.android.conversationlist.paging.MovieListPagedDataProviderFactory
-import eu.letmehelpu.android.conversationlist.paging.MoviesPageDataProvider
-import eu.letmehelpu.android.conversationlist.paging.MoviesPageDataProviderImpl
-import eu.letmehelpu.android.jobexecutor.PageProviderExecutor
 import eu.letmehelpu.android.messaging.MessagingService
 import eu.letmehelpu.android.messaging.SendMessage
 import eu.letmehelpu.android.model.Conversation
+import javax.inject.Inject
 
-class ConversationActivity : AppCompatActivity() {
+class ConversationActivity : DaggerAppCompatActivity() {
 
     private lateinit var adapter : MessagesListAdapter
    // private lateinit var userId: Long
     private lateinit var conversation: Conversation
     private lateinit var conversationViewModel: ConversationViewModel
 
+    @Inject
+    lateinit var sendMessage: SendMessage
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val provider: MoviesPageDataProvider = MoviesPageDataProviderImpl()
-        val mo = MovieListPagedDataProviderFactory(provider)
 
         val userId = intent.getLongExtra(EXTRA_USER_ID, -1)
         conversation = intent.getSerializableExtra(EXTRA_CONVERSATION) as Conversation
         val otherUsers = conversation.users.keys.map { it -> it.toLong() }.filter { it != userId }
-        adapter =
-
-                MessagesListAdapter(object : AbsPagedListAdapter.RetryListener {
-                    override fun retryCalled() {
-                        //movieListViewModel.retry()
-                    }
-                },
-                        otherUsers.toTypedArray()
-
-                        )
+        adapter = MessagesListAdapter(otherUsers)
 
         setContentView(R.layout.conversation)
 
@@ -55,7 +43,7 @@ class ConversationActivity : AppCompatActivity() {
         messages.adapter = adapter
 
 
-        conversationViewModel = ViewModelProviders.of(this, ConversationViewModelFactory(userId, conversation, mo, PageProviderExecutor(), SendMessage())).get(ConversationViewModel::class.java)
+        conversationViewModel = ViewModelProviders.of(this, ConversationViewModelFactory(userId, conversation, sendMessage)).get(ConversationViewModel::class.java)
 
         conversationViewModel.getMessages().observe(this, Observer {
             it?.let{ adapter.submitList(it)}
@@ -79,7 +67,7 @@ class ConversationActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         startedConversation = conversation.documentId
-        startService(MessagingService.createDeleteNotificationIntent(this, conversation))
+        sendBroadcast(MessagingService.createDeleteNotificationIntent(this, conversation))
     }
 
     override fun onStop() {

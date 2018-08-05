@@ -14,6 +14,9 @@ import java.util.*
 class LoadMessages {
 
     public fun loadMessagesAfterTimestamp(conversation: Conversation, time: Timestamp, mustInclude: Long): Single<List<Message>> {
+        return loadMessagesAfterTimestamp(conversation.documentId, time, mustInclude);
+    }
+    public fun loadMessagesAfterTimestamp(conversationId: String, time: Timestamp, mustInclude: Long): Single<List<Message>> {
 
         return Single.create(object : SingleOnSubscribe<List<Message>> {
             override fun subscribe(emitter: SingleEmitter<List<Message>>) {
@@ -22,7 +25,7 @@ class LoadMessages {
 
                 val db = FirebaseFirestore.getInstance()
                 registration = db.collection(AppConstant.COLLECTION_CONVERSATION)
-                        .document(conversation.documentId)
+                        .document(conversationId)
                         .collection("messages")
                         .whereGreaterThanOrEqualTo("sendTimestamp", time)
                         .orderBy("sendTimestamp", Query.Direction.DESCENDING)
@@ -63,6 +66,9 @@ class LoadMessages {
 
     val MESSAGES_LIMIT = 10L
     public fun loadMessagesWithTimestamp(conversation: Conversation, mustInclude: Long): Observable<List<Message>> {
+        return loadMessagesWithTimestamp(conversation.documentId, mustInclude)
+    }
+    public fun loadMessagesWithTimestamp(conversationId: String, mustInclude: Long): Observable<List<Message>> {
         return Observable.create<List<Message>>({ emitter: ObservableEmitter<List<Message>> ->
 
             var registration: ListenerRegistration? = null
@@ -79,7 +85,7 @@ class LoadMessages {
             })
             val db = FirebaseFirestore.getInstance()
             registration = db.collection(AppConstant.COLLECTION_CONVERSATION)
-                    .document(conversation.documentId)
+                    .document(conversationId)
                     .collection("messages")
                     .orderBy("sendTimestamp", Query.Direction.DESCENDING)
                     .limit(MESSAGES_LIMIT)

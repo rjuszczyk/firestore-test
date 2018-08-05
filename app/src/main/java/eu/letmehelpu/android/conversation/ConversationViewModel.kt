@@ -12,7 +12,6 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.*
 import com.google.firebase.firestore.EventListener
 import eu.letmehelpu.android.AppConstant
-import eu.letmehelpu.android.conversationlist.paging.MovieListPagedDataProviderFactory
 import eu.letmehelpu.android.messaging.SendMessage
 import eu.letmehelpu.android.model.Conversation
 import eu.letmehelpu.android.model.ConversationDocument
@@ -26,7 +25,6 @@ import java.util.concurrent.Executor
 class ConversationViewModel(
         private val userId: Long,
         val conversation: Conversation,
-        private val movieListPagedDataProviderFactory: MovieListPagedDataProviderFactory,
         mainThreadExecutor: Executor,
         private val sendMessage: SendMessage
 ) : ViewModel() {

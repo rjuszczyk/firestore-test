@@ -4,6 +4,8 @@ apply plugin: 'kotlin-android'
 
 apply plugin: 'kotlin-android-extensions'
 
+apply plugin: 'kotlin-kapt'
+
 android {
     compileSdkVersion 27
     defaultConfig {
@@ -43,6 +45,13 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.8.2'
     implementation 'com.squareup.retrofit2:retrofit:2.3.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.3.0'
+
+    implementation  "com.google.dagger:dagger:${project.ext.daggerVersion}"
+    implementation "com.google.dagger:dagger-android:${project.ext.daggerVersion}"
+    implementation "com.google.dagger:dagger-android-support:${project.ext.daggerVersion}"
+    kapt "com.google.dagger:dagger-compiler:${project.ext.daggerVersion}"
+    kapt "com.google.dagger:dagger-android-processor:${project.ext.daggerVersion}"
+
 
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.2'

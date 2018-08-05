@@ -9,7 +9,7 @@ import eu.letmehelpu.android.model.FirstMessage
 import eu.letmehelpu.android.model.Message
 
 class MessagesListAdapter(
-        private val otherUsers: Array<Long>) :
+        private val otherUsers: List<Long>) :
         PagedListAdapter<Message, MessagesListAdapter.MessageViewHolder>(MessagesCallback()) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {

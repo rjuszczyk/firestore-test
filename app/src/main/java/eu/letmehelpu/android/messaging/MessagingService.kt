@@ -4,21 +4,26 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.IBinder
 import android.support.v4.app.NotificationManagerCompat
 import android.support.v4.app.RemoteInput
+import dagger.android.AndroidInjection
 import eu.letmehelpu.android.model.Conversation
+import eu.letmehelpu.android.model.Message
 import eu.letmehelpu.android.notification.MessagesNotificationManager
 import io.reactivex.disposables.Disposable
-import java.util.*
+import javax.inject.Inject
 
 class MessagingService : Service() {
 
-    private val loadMessages = LoadMessages()
-    private val sendMessage = SendMessage()
+    @Inject lateinit var loadMessages: LoadMessages
+    @Inject
+    lateinit var sendMessage: SendMessage
     private lateinit var userIdStoreage:UserIdStoreage
     private val messagesNotificationManager = MessagesNotificationManager()
     private val conversationToRegistration = HashMap<String, Disposable>()
@@ -34,23 +39,22 @@ class MessagingService : Service() {
         val DELETE_NOTIFICATION_ACTION = "DELETE_NOTIFICATION_ACTION"
 
         fun createSendMessageIntent(context: Context, conversation: Conversation) : Intent{
-            val intent = Intent(context, MessagingService::class.java)
-            intent.action = SEND_MESSAGE_ACTION
+            val intent = Intent(SEND_MESSAGE_ACTION)
             intent.putExtra("conversation", conversation)
+
             return intent
         }
 
-        fun createDisplayConversationIntent(context: Context, conversation: Conversation, mustInclude:Long) : Intent{
+        fun createDisplayConversationIntent(context: Context, conversation: Conversation, messages: ArrayList<Message>) : Intent{
             val intent = Intent(context, MessagingService::class.java)
             intent.action = NEW_MESSAGE_ACTION
             intent.putExtra("conversation", conversation)
-            intent.putExtra("mustInclude", mustInclude)
+            intent.putExtra("messages", messages)
             return intent
         }
 
         fun createDeleteNotificationIntent(context: Context, conversation: Conversation) : Intent {
-            val intent = Intent(context, MessagingService::class.java)
-            intent.action = DELETE_NOTIFICATION_ACTION
+            val intent = Intent(DELETE_NOTIFICATION_ACTION)
             intent.putExtra("conversation", conversation)
             return intent
         }
@@ -58,9 +62,30 @@ class MessagingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        AndroidInjection.inject(this)
         userIdStoreage = UserIdStoreage(getSharedPreferences("messaging", Context.MODE_PRIVATE))
         createNotificationChannel()
 
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(DELETE_NOTIFICATION_ACTION)
+        intentFilter.addAction(SEND_MESSAGE_ACTION)
+
+        registerReceiver(object : BroadcastReceiver() {
+            override fun onReceive(p0: Context, intent: Intent) {
+                if(intent.action == SEND_MESSAGE_ACTION) {
+                    val conversation = intent.getSerializableExtra("conversation") as Conversation
+
+                    val message = getReplyMessage(intent)
+
+                    sendMessage(conversation, message)
+                }
+                if(intent.action == DELETE_NOTIFICATION_ACTION) {
+                    val conversation = intent.getSerializableExtra("conversation") as Conversation
+                    stopForegroundForConversation(conversation.documentId)
+                }
+            }
+
+        }, intentFilter)
     }
 
     private fun createNotificationChannel() {
@@ -81,24 +106,11 @@ class MessagingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         intent?.let {
-
-            if(it.action == SEND_MESSAGE_ACTION) {
-                val conversation = intent.getSerializableExtra("conversation") as Conversation
-
-                val message = getReplyMessage(intent)
-
-                sendMessage(conversation, message)
-            }
             if(it.action == NEW_MESSAGE_ACTION) {
-                val mustInclude = intent.getLongExtra("mustInclude", -1)
-                if (mustInclude  == -1L) throw IllegalArgumentException("construct only with createIntent method")
+                val messages = intent.getParcelableArrayListExtra<Message>("messages")
                 val conversation = intent.getSerializableExtra("conversation") as Conversation
 
-                displayChatOrLoggoutUser(conversation, mustInclude)
-            }
-            if(it.action == DELETE_NOTIFICATION_ACTION) {
-                val conversation = intent.getSerializableExtra("conversation") as Conversation
-                hideChat(conversation)
+                displayChatOrLoggoutUser(conversation, messages)
             }
         }
 
@@ -113,28 +125,60 @@ class MessagingService : Service() {
         }
     }
 
-    fun displayChatOrLoggoutUser(conversation:Conversation, mustInclude:Long) {
+    fun displayChatOrLoggoutUser(conversation:Conversation, messages:List<Message>) {
         userIdStoreage.userId?.let {
-            displayChat(conversation, it, mustInclude)
+            displayChat(conversation, it, messages)
         }?: run {
             onUserLoggedOut()
         }
     }
 
-    fun displayChat(conversation:Conversation, userId:Long, mustInclude:Long) {
+    fun displayChat(conversation:Conversation, userId:Long, messages:List<Message>) {
         if(!isDisplayed(conversation)) {
-            val disposable = loadMessages.loadMessagesWithTimestamp(conversation, mustInclude).subscribe {
+            val notification = messagesNotificationManager.createNotifciation(this, conversation, userId, messages)
+            val notificationId = getNotificationIdForConversation(conversation.documentId)
+            startForegrodundForConversation(conversation.documentId, notificationId, notification)
+
+            val mustInclude = messages.first().sendTimestamp.toDate().time
+            val disposable = loadMessages.loadMessagesWithTimestamp(conversation.documentId, mustInclude).subscribe {
                 val notification = messagesNotificationManager.createNotifciation(this, conversation, userId, it)
                 val notificationId = getNotificationIdForConversation(conversation.documentId)
-                if(isForeground()) {
-                    startForeground(notificationId, notification)
-                } else {
-                    val notificationManager = NotificationManagerCompat.from(this@MessagingService)
-                    notificationManager.notify(notificationId , notification)
-                }
-                conversationToNotification.put(conversation.documentId, notification)
+
+                val notificationManager = NotificationManagerCompat.from(this@MessagingService)
+                notificationManager.notify(notificationId , notification)
             }
-            setDisplayed(conversation, disposable)
+
+            conversationToRegistration.put(conversation.documentId, disposable)
+        }
+    }
+
+
+    var currentForegroundChat: String? = null
+    private fun startForegrodundForConversation(documentId: String, notificationId: Int, notification: Notification) {
+        currentForegroundChat = documentId
+        startForeground(notificationId, notification)
+        conversationToNotification.put(documentId, notification)
+    }
+
+    private fun stopForegroundForConversation(documentId: String) {
+        val notification = conversationToNotification.remove(documentId)
+        val disposable = conversationToRegistration.remove(documentId)
+        disposable?.dispose()
+        if(documentId.equals(currentForegroundChat)) {
+            currentForegroundChat = null
+            val notificationManager = NotificationManagerCompat.from(this@MessagingService)
+            val notificationId = getNotificationIdForConversation(documentId)
+            notificationManager.cancel(notificationId)
+
+            if(conversationToNotification.isEmpty()) {
+                stopForeground(true)
+            } else {
+                val nextDocumentId = conversationToNotification.entries.first().key
+                val nextNotificationId = getNotificationIdForConversation(nextDocumentId)
+                val nextNotification = conversationToNotification.entries.first().value
+
+                startForeground(nextNotificationId, nextNotification)
+            }
         }
     }
 
@@ -150,47 +194,16 @@ class MessagingService : Service() {
         conversationToRegistration.clear()
         conversationToNotification.clear()
         stopForeground(true)
-    }
 
-    var boundedConversation: Conversation? = null
-    private fun isForeground() : Boolean {
-        return boundedConversation != null
-    }
-
-    private fun setForegroundConversation(conversation: Conversation) {
-        boundedConversation = conversation
+        currentForegroundChat = null
     }
 
     private fun getNotificationIdForConversation(conversationId: String): Int {
         return conversationId.hashCode()
     }
 
-    private fun setDisplayed(conversation: Conversation, disposable: Disposable) {
-        conversationToRegistration.put(conversation.documentId, disposable)
-    }
-
     private fun isDisplayed(conversation: Conversation): Boolean {
         return conversationToRegistration.containsKey(conversation.documentId)
-    }
-
-    fun hideChat(conversation: Conversation) {
-        val disposable = conversationToRegistration.remove(conversation.documentId)
-
-        disposable?.let {
-            it.dispose()
-            if(conversation == boundedConversation) {
-                if(!conversationToRegistration.isEmpty()) {
-                    val nextNotification = conversationToRegistration.entries.first().key
-                    val notificationId = getNotificationIdForConversation(nextNotification)
-                    val notification = conversationToNotification.remove(nextNotification)
-                    notification?.let {
-                        startForeground(notificationId, it)
-                    }
-                } else {
-                    stopSelf()
-                }
-            }
-        }
     }
 
     private fun getReplyMessage(intent: Intent): String {

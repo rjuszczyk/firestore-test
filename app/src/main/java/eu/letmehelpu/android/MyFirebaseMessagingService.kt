@@ -11,18 +11,28 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
+import dagger.android.AndroidInjection
 import eu.letmehelpu.android.conversation.ConversationActivity
+import eu.letmehelpu.android.messaging.LoadMessages
 import eu.letmehelpu.android.messaging.MessagingService
 import eu.letmehelpu.android.messaging.UserIdStoreage
 import eu.letmehelpu.android.model.Conversation
 import eu.letmehelpu.android.model.ConversationDocument
+import eu.letmehelpu.android.model.Message
+import io.reactivex.disposables.Disposable
+import io.reactivex.functions.Consumer
+import javax.inject.Inject
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
     val gson = Gson()
     val TAG="RADEK"
+
+    @Inject
+    lateinit var loadMessages: LoadMessages
     lateinit var userIdStoreage: UserIdStoreage
     override fun onCreate() {
         super.onCreate()
+        AndroidInjection.inject(this)
         userIdStoreage = UserIdStoreage(getSharedPreferences("messaging", Context.MODE_PRIVATE))
         createNotificationChannel()
 
@@ -66,14 +76,33 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         }
     }
 
+    val conversationDisposables = HashMap<String, Disposable>()
     private fun loadConversation(conversationId: String, noOlderThan: Long) {
         val db = FirebaseFirestore.getInstance()
 
+        conversationDisposables.remove(conversationId)?.dispose()
+
         db.collection(AppConstant.COLLECTION_CONVERSATION).document(conversationId).get().addOnSuccessListener {
-            var conversationDocument = it?.toObject(ConversationDocument::class.java)
-            conversationDocument?.let {
-                if (it.timestamp.toDate().time >= noOlderThan) {
-                    startServiceForegroundCompat(this@MyFirebaseMessagingService, MessagingService.createDisplayConversationIntent(this@MyFirebaseMessagingService, Conversation(conversationDocument, conversationId), noOlderThan))
+            it?.let {
+                val conversationDocument = it.toObject(ConversationDocument::class.java)!!
+                val documentId = it.id
+
+                if (conversationDocument.timestamp.toDate().time >= noOlderThan) {
+                    var disposable = loadMessages.loadMessagesWithTimestamp(Conversation(conversationDocument, documentId), noOlderThan)
+                            .firstOrError().subscribe(object : Consumer<List<Message>> {
+                                override fun accept(t: List<Message>) {
+                                    startServiceForegroundCompat(
+                                            this@MyFirebaseMessagingService,
+                                            MessagingService.createDisplayConversationIntent(
+                                                    this@MyFirebaseMessagingService,
+                                                    Conversation(conversationDocument, conversationId),
+                                                    ArrayList(t)))
+                                }
+
+                            })
+
+                    conversationDisposables.put(conversationId, disposable)
+
                 } else {
                     Log.d(TAG, "no in store")
                 }
@@ -87,14 +116,10 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     companion object {
         fun startServiceForegroundCompat(context:Context, intent:Intent) {
-            if(isMyServiceRunning(context, MessagingService.javaClass)) {
-                context.startService(intent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
             } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
-                    context.startService(intent)
-                }
+                context.startService(intent)
             }
         }
 
