@@ -8,6 +8,7 @@ import dagger.android.support.AndroidSupportInjectionModule
 import eu.letmehelpu.android.LmhuApplication
 
 @Component(modules = [
+    AppModule::class,
     MessagingModule::class,
     ActivityBuilder::class,
     AndroidSupportInjectionModule::class

@@ -12,10 +12,8 @@ import io.reactivex.disposables.Disposable
 import java.util.*
 
 class LoadMessages {
+    val MESSAGES_LIMIT = 10L
 
-    public fun loadMessagesAfterTimestamp(conversation: Conversation, time: Timestamp, mustInclude: Long): Single<List<Message>> {
-        return loadMessagesAfterTimestamp(conversation.documentId, time, mustInclude);
-    }
     public fun loadMessagesAfterTimestamp(conversationId: String, time: Timestamp, mustInclude: Long): Single<List<Message>> {
 
         return Single.create(object : SingleOnSubscribe<List<Message>> {
@@ -28,6 +26,7 @@ class LoadMessages {
                         .document(conversationId)
                         .collection("messages")
                         .whereGreaterThanOrEqualTo("sendTimestamp", time)
+                        .limit(MESSAGES_LIMIT)
                         .orderBy("sendTimestamp", Query.Direction.DESCENDING)
                         .addSnapshotListener(object : EventListener<QuerySnapshot> {
                             override fun onEvent(p0: QuerySnapshot?, p1: FirebaseFirestoreException?) {
@@ -61,50 +60,6 @@ class LoadMessages {
                     }
                 })
             }
-        })
-    }
-
-    val MESSAGES_LIMIT = 10L
-    public fun loadMessagesWithTimestamp(conversation: Conversation, mustInclude: Long): Observable<List<Message>> {
-        return loadMessagesWithTimestamp(conversation.documentId, mustInclude)
-    }
-    public fun loadMessagesWithTimestamp(conversationId: String, mustInclude: Long): Observable<List<Message>> {
-        return Observable.create<List<Message>>({ emitter: ObservableEmitter<List<Message>> ->
-
-            var registration: ListenerRegistration? = null
-            emitter.setDisposable(object : Disposable {
-                var disposed = false
-                override fun isDisposed(): Boolean {
-                    return disposed
-                }
-
-                override fun dispose() {
-                    disposed = true
-                    registration?.remove()
-                }
-            })
-            val db = FirebaseFirestore.getInstance()
-            registration = db.collection(AppConstant.COLLECTION_CONVERSATION)
-                    .document(conversationId)
-                    .collection("messages")
-                    .orderBy("sendTimestamp", Query.Direction.DESCENDING)
-                    .limit(MESSAGES_LIMIT)
-                    .addSnapshotListener(object : EventListener<QuerySnapshot> {
-                        override fun onEvent(p0: QuerySnapshot?, p1: FirebaseFirestoreException?) {
-                            p0?.let {
-                                val messages = it.toObjects(Message::class.java)
-
-                                if (!includes(messages, mustInclude)) {
-                                    return
-                                }
-
-                                if (!emitter.isDisposed) {
-                                    emitter.onNext(messages)
-                                }
-                            }
-                        }
-                    })
-
         })
     }
 

@@ -32,7 +32,7 @@
                 <action android:name="com.google.firebase.INSTANCE_ID_EVENT"/>
             </intent-filter>
         </service>
-        <service android:name=".messaging.MessagingService" />
+        <service android:name=".messaging.SendMessageService" />
     </application>
 
 </manifest>

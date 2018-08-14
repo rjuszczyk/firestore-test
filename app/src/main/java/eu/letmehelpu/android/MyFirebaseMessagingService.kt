@@ -6,7 +6,9 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.support.v4.app.NotificationManagerCompat
 import android.util.Log
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -14,13 +16,14 @@ import com.google.gson.Gson
 import dagger.android.AndroidInjection
 import eu.letmehelpu.android.conversation.ConversationActivity
 import eu.letmehelpu.android.messaging.LoadMessages
-import eu.letmehelpu.android.messaging.MessagingService
 import eu.letmehelpu.android.messaging.UserIdStoreage
 import eu.letmehelpu.android.model.Conversation
 import eu.letmehelpu.android.model.ConversationDocument
 import eu.letmehelpu.android.model.Message
+import eu.letmehelpu.android.notification.MessagesNotificationManager
 import io.reactivex.disposables.Disposable
 import io.reactivex.functions.Consumer
+import java.util.*
 import javax.inject.Inject
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
@@ -29,6 +32,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     @Inject
     lateinit var loadMessages: LoadMessages
+    @Inject
+    lateinit var messagesNotificationManager: MessagesNotificationManager
     lateinit var userIdStoreage: UserIdStoreage
     override fun onCreate() {
         super.onCreate()
@@ -86,28 +91,29 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             it?.let {
                 val conversationDocument = it.toObject(ConversationDocument::class.java)!!
                 val documentId = it.id
-
                 if (conversationDocument.timestamp.toDate().time >= noOlderThan) {
-                    var disposable = loadMessages.loadMessagesWithTimestamp(Conversation(conversationDocument, documentId), noOlderThan)
-                            .firstOrError().subscribe(object : Consumer<List<Message>> {
-                                override fun accept(t: List<Message>) {
-                                    startServiceForegroundCompat(
-                                            this@MyFirebaseMessagingService,
-                                            MessagingService.createDisplayConversationIntent(
-                                                    this@MyFirebaseMessagingService,
-                                                    Conversation(conversationDocument, conversationId),
-                                                    ArrayList(t)))
-                                }
+                    val conversation = Conversation(conversationDocument, documentId)
+                    val userId = userIdStoreage.userId
 
+                    val lastRead = conversation.lastRead[userId.toString()]?: 0
+                    Log.d("RADEK_LAST_READ", "" + lastRead)
+                    var disposable = loadMessages.loadMessagesAfterTimestamp(conversation.documentId, Timestamp(Date(lastRead)), noOlderThan)
+                            .subscribe(object : Consumer<List<Message>> {
+                                override fun accept(t: List<Message>) {
+                                    messagesNotificationManager.displayConversationNotification(conversation, userId, t)
+                                }
                             })
 
                     conversationDisposables.put(conversationId, disposable)
-
                 } else {
                     Log.d(TAG, "no in store")
                 }
             }
         }
+    }
+
+    private fun getNotificationIdForConversation(conversationId: String): Int {
+        return conversationId.hashCode()
     }
 
     override fun onDeletedMessages() {

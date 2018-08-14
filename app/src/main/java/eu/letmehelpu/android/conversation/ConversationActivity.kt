@@ -5,7 +5,6 @@ import android.arch.lifecycle.ViewModelProviders
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.view.inputmethod.EditorInfo
@@ -13,8 +12,8 @@ import android.widget.EditText
 import android.widget.TextView
 import dagger.android.support.DaggerAppCompatActivity
 import eu.letmehelpu.android.R
-import eu.letmehelpu.android.messaging.MessagingService
 import eu.letmehelpu.android.messaging.SendMessage
+import eu.letmehelpu.android.messaging.SendMessageService
 import eu.letmehelpu.android.model.Conversation
 import javax.inject.Inject
 
@@ -67,7 +66,8 @@ class ConversationActivity : DaggerAppCompatActivity() {
     override fun onStart() {
         super.onStart()
         startedConversation = conversation.documentId
-        sendBroadcast(MessagingService.createDeleteNotificationIntent(this, conversation))
+
+        startService(SendMessageService.createDismissConversationIntent(this, conversation))
     }
 
     override fun onStop() {
